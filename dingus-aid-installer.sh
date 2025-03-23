@@ -19,7 +19,7 @@ chmod +x ./output/dingus-aid
 
 # Step 5: Move the binary to /usr/local/bin for global use
 echo "Moving the binary to /usr/local/bin..."
-sudo mv ./output/dingus-aid /usr/local/bin/
+mv ./output/dingus-aid /usr/local/bin/
 
 # Step 6: Confirm the binary is accessible
 if ! command -v dingus-aid &>/dev/null; then
