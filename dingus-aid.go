@@ -17,9 +17,10 @@ import (
 
 // Config files stored in user's home directory
 var (
-	configDir    string
-	configFile   string
-	openaiAPIKey string
+	configDir     string
+	configFile    string
+	historyFile   string
+	openaiAPIKey  string
 )
 
 // ANSI color codes
@@ -33,8 +34,8 @@ const (
 
 // Structure to hold a command entry
 type Entry struct {
-	Query    string
-	Response string
+	Query    string `json:"query"`
+	Response string `json:"response"`
 }
 
 // Initialize config directory and files
@@ -54,6 +55,7 @@ func initConfigFiles() error {
 	
 	// Set global file paths
 	configFile = filepath.Join(configDir, "config.json")
+	historyFile = filepath.Join(configDir, "history.json")
 	
 	return nil
 }
@@ -87,6 +89,46 @@ func loadAPIKey() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("API key not found")
+}
+
+// Load history from file
+func loadHistory() ([]Entry, error) {
+	history := []Entry{}
+	
+	// Check if history file exists
+	if _, err := os.Stat(historyFile); os.IsNotExist(err) {
+		// Return empty history if file doesn't exist
+		return history, nil
+	}
+	
+	// Read the history file
+	data, err := os.ReadFile(historyFile)
+	if err != nil {
+		return history, fmt.Errorf("failed to read history file: %v", err)
+	}
+	
+	// Unmarshal JSON into history slice
+	err = json.Unmarshal(data, &history)
+	if err != nil {
+		return history, fmt.Errorf("failed to parse history file: %v", err)
+	}
+	
+	return history, nil
+}
+
+// Save history to file
+func saveHistory(history []Entry) error {
+	historyJSON, err := json.MarshalIndent(history, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to encode history: %v", err)
+	}
+	
+	err = os.WriteFile(historyFile, historyJSON, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to write history file: %v", err)
+	}
+	
+	return nil
 }
 
 // Remove all configuration files
@@ -135,18 +177,19 @@ Here is the history of the current CLI session:
 Always adhere to these rules when suggesting the command:
 - The command must be a valid terminal command.
 - It should be a continuation of the conversation.
-- It must be relevant to the user's query.
+- It should be relevant to the user's query.
+- Consider the user's recent command history to provide context-aware suggestions.
 - The command should not require user input.
 - It must not be destructive or modify the system in any harmful way.
-- Avoid duplicates of previous commands in this session.
-- The command should not require additional software, configuration, or access to external resources, the internet, or sensitive information.
-- The command should not reference user-specific files or data.
+- The command should not require additional software, configuration, or access to external resources, the internet, or sensitive information unless the history shows the user has been working with these.
+- The command should not reference user-specific files or data unless evident from their command history.
 
 Format your response as follows:
 - Only respond with the suggested command.
 - Ensure the command is executable in the current session.
 - Do not include any additional information or context.
 - Do not include any formattings.
+- Do not include 'dingus-aid' in the command.
 
 The user query is as follows:
 
@@ -272,9 +315,6 @@ func main() {
 		log.Fatalf("Error initialising config: %v", err)
 	}
 
-	// Create an in-memory history list
-	history := []Entry{}
-	
 	// Check if this is a cleanup command
 	if len(os.Args) >= 2 && os.Args[1] == "cleanup" {
 		err := cleanupConfigFiles()
@@ -315,6 +355,14 @@ func main() {
 		}
 		fmt.Println("API key saved.")
 	}
+	
+	// Load command history from file
+	history, err := loadHistory()
+	if err != nil {
+		log.Printf("Warning: Could not load command history: %v", err)
+		// Continue with empty history if there's an error
+		history = []Entry{}
+	}
 
 	// Get the suggested command from OpenAI
 	suggestedCommand, err := getCommandSuggestion(query, history)
@@ -329,12 +377,6 @@ func main() {
 		colorCyan, colorBold, 
 		suggestedCommand,
 		colorReset, colorReset)
-
-	// Copy command to clipboard automatically for convenience
-	// err = copyToClipboard(suggestedCommand)
-	// if err == nil {
-	// 	fmt.Printf("%sCommand copied to clipboard!%s\n\n", colorGreen, colorReset)
-	// }
 
 	// Ask if the user wants to run the command
 	reader := bufio.NewReader(os.Stdin)
@@ -357,8 +399,7 @@ func main() {
 			fmt.Printf("\n%sCommand output:%s\n%s\n", colorBold, colorReset, output)
 		}
 
-		// Update in-memory history
-		// We'll keep this entry in memory for this session, but it won't persist
+		// Update history with new entry
 		history = append(history, Entry{
 			Query:    query,
 			Response: output,
@@ -369,22 +410,19 @@ func main() {
 			history = history[1:]
 		}
 		
+		// Save updated history to file
+		err = saveHistory(history)
+		if err != nil {
+			log.Printf("Warning: Could not save command history: %v", err)
+		}
+		
 	case "c":
 		// copy to clipboard
 		err = copyToClipboard(suggestedCommand)
 		if err == nil {
 			fmt.Printf("%sCommand copied to clipboard!%s\n\n", colorGreen, colorReset)
 		}
-		// err = copyPasteToTerminal(suggestedCommand)
-		// if err != nil {
-		// 	fmt.Printf("Could not paste to terminal: %v\n", err)
-		// 	fmt.Println("You may need to install xdotool (Linux) or ensure permissions are set correctly.")
-		// 	fmt.Println("The command is still in your clipboard - you can manually paste it.")
-		// } else {
-		// 	fmt.Printf("%sCommand pasted to terminal!%s\n", colorGreen, colorReset)
-		// }
 		
-		// Don't record anything in history as we didn't run the command
 		fmt.Println("Command not executed.")
 	default:
 		fmt.Println("Command not executed.")
