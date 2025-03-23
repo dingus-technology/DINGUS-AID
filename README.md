@@ -1,0 +1,96 @@
+# Dingus CLI Tool - The Command-Suggestion Wizard 🧙‍♂️
+
+Welcome to **Dingus Aid**! 🛠️ This command-line tool is here to help you by suggesting and running the right commands for you—automatically! Whether you're a beginner or a seasoned pro, Dingus Aid uses the power of AI to figure out the next step based on your query.
+
+### What's This All About?
+Do you find yourself stuck in the middle of a command-line labyrinth? No worries! This tool will analyze your query, give you a **suggested command**, and then let you run it with just a few keystrokes. It's like having a command-line buddy who never gets tired! 💬
+
+---
+
+## Quick Setup
+
+Make sure you have docker installed.
+
+1. **Build the Binary**
+   - Let's set up the Dingus CLI tool by building the Docker image:
+     ```bash
+     ./dingus-aid-installer.sh
+     ```
+     or
+     ```bash
+     bash dingus-aid-installer.sh
+     ```
+
+2. **Install the Tool**
+   - The `dingus-aid` binary will be placed in `/usr/local/bin`, ready for use from anywhere in your terminal.
+
+3. **Configure Your API Key**
+   - When you run the tool for the first time, you'll need to enter your OpenAI API key. Don't worry, it'll be saved in the `config.json` file for later and easy to remove if you need to wipe it from your machine. 🔑
+
+4. **Start Using It**
+   - To ask Dingus Aid a question, just run:
+     ```bash
+     dingus-aid "How do I list files in a directory?"
+     ```
+   - Dingus Aid will suggest the correct command and ask if you want to run it. Simple as that!
+
+---
+
+## Features
+
+- **Command Suggestions**: Ask a question, and Dingus Aid will suggest the most appropriate command.
+- **Automatic History Tracking**: It keeps track of your session history, so it remembers the context of your previous queries.
+- **Run Commands with Confidence**: If you agree with the suggestion, Dingus Aid will run it for you and show the results.
+- **Session Persistence**: Your queries and their results are saved in a history file, so you can pick up where you left off.
+
+---
+
+## Example Workflow
+
+1. **Query the CLI Tool**:
+   ```bash
+   dingus-aid "How do I copy files?"
+   ```
+   Dingus Aid might suggest:
+   ```bash
+   cp source_file destination_file
+   ```
+
+2. **Confirm the Command**:
+   Dingus Aid will ask:
+   ```bash
+   Do you want to run this command? (y/n):
+   ```
+   Hit **y** to execute the command, or **n** to skip.
+
+3. **Enjoy the Output**:
+   Dingus Aid will show you the results of the command execution.
+
+---
+
+## Advanced Features
+
+- **Session History**: All your queries and responses are saved in a JSON file (`cli_session_history.json`), so you can refer back to them later.
+- **OpenAI Integration**: It uses the OpenAI API to generate intelligent command suggestions. This keeps it smart and adaptable to your workflow!
+
+---
+
+## Troubleshooting
+
+- **API Key Missing**: If you don't have an API key, the tool will prompt you to enter one. Make sure you save it, and Dingus Aid will handle the rest!
+  
+- **Binary Not Found**: If you ever get a `dingus-aid command not found` error, just run `./install.sh` again, and it will restore the binary.
+
+---
+
+## Contribute
+
+Want to make Dingus Aid even smarter? 🧠 Feel free to fork this repo and create a pull request with your changes. If you've got a cool new feature in mind, let us know, and we'll make it happen!
+
+---
+
+## Credits
+
+This tool is powered by the **Dingus** team and **OpenAI's GPT** for intelligent command suggestions. A big thank you to both for making this possible!
+
+Happy command-line adventuring! 🎉

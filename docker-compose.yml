@@ -1,0 +1,5 @@
+services:
+  dingus-aid:
+    build: .
+    volumes:
+      - ./:/go/src/app/
