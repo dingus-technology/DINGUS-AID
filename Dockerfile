@@ -2,10 +2,9 @@
 FROM golang:1.19
 
 # Set the working directory inside the container
-WORKDIR /go/src/app
+WORKDIR /go/src
 
-# Copy your Go code and go.mod file into the container
-COPY dingus-aid.go .
-COPY go.mod .
+# Copy code into the container
+COPY app/ app/
 
-CMD ["bash", "./make-binary.sh"]
+CMD ["bash", "make-binary.sh"]

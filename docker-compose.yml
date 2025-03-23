@@ -2,4 +2,5 @@ services:
   dingus-aid:
     build: .
     volumes:
-      - ./:/go/src/app/
+      - ./app/:/go/src/
+      - ./output/:/go/src/output/
