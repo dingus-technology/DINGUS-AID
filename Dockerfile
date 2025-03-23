@@ -7,4 +7,4 @@ WORKDIR /go/src
 # Copy code into the container
 COPY app/ app/
 
-CMD ["bash", "make-binary.sh"]
+CMD ["bash", "app/make-binary.sh"]
