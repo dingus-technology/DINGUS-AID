@@ -1,5 +1,9 @@
 # [**Dingus**](http://www.dingusai.dev) CLI Tool - The Command-Suggestion Wizard 🧙‍♂️
 
+<p align="center">
+   <img src="assets/dingus-aid-example.png" width="60%">
+</p>
+
 Welcome to **Dingus Aid**! 🛠️ This command-line tool is here to help you by suggesting and running the right commands for you—automatically! Whether you're a beginner or a seasoned pro, Dingus Aid uses the power of AI to figure out the next step based on your query.
 
 ### What's This All About?
