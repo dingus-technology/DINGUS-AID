@@ -167,10 +167,11 @@ func getCommandSuggestion(query string) (string, int, int, error) {
 Always adhere to these rules when suggesting the command:
 - The command must be a valid terminal command.
 - It should be relevant to the user's query.
+- Continue the conversation by giving useful commands.
+- Consider the chat history and make the command more useful than before based on the user's follow up questions.
 - The command should not require user input.
 - It must not be destructive or modify the system in any harmful way.
 - The command should not require additional software, configuration, or access to external resources, the internet, or sensitive information.
-- The command should not reference user-specific files or data.
 
 Format your response as follows:
 - Only respond with the suggested command.
