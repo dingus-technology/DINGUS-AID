@@ -42,7 +42,7 @@ Make sure you have docker installed.
      Enter your OpenAI API Key: <YOUR OPENAI API KEY HERE>
      ```
    - To ask Dingus Aid a question, just run:
-     ```bash
+     ```
      dingus-copilot How do I list files in a directory?
      ```
    - Dingus Aid will suggest the correct command and ask if you want to run it. Simple as that!
