@@ -7,6 +7,9 @@ OUTPUT_DIR="./output"
 INSTALL_DIR="/usr/local/bin"
 LOG_FILE="logs/setup_$(date +%Y%m%d_%H%M%S).log"
 
+# Ensure logs directory exists
+mkdir -p "$(dirname "$LOG_FILE")"
+
 # Function for colorized logging
 log() {
     local level=$1
@@ -17,17 +20,14 @@ log() {
         "INFO")
             # Green text
             echo -e "\033[0;32m[INFO]\033[0m $timestamp - $message"
-            echo "[INFO] $timestamp - $message"
             ;;
         "WARN")
             # Yellow text
             echo -e "\033[0;33m[WARN]\033[0m $timestamp - $message"
-            echo "[WARN] $timestamp - $message"
             ;;
         "ERROR")
             # Red text
             echo -e "\033[0;31m[ERROR]\033[0m $timestamp - $message"
-            echo "[ERROR] $timestamp - $message"
             ;;
     esac
 }
@@ -106,39 +106,21 @@ if [ ! -w "$INSTALL_DIR" ]; then
         exit 1
     fi
     
-    # Check if the binary already exists in the target location
-    if [ -f "$INSTALL_DIR/$BINARY_NAME" ]; then
-        log "WARN" "$BINARY_NAME already exists in $INSTALL_DIR. Creating backup..."
-        sudo mv "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/${BINARY_NAME}.backup" || {
-            log "ERROR" "Failed to create backup of existing binary"
-            exit 1
-        }
-        log "INFO" "Backup created at $INSTALL_DIR/${BINARY_NAME}.backup"
-    fi
-    
-    # Copy the binary
-    sudo cp "$OUTPUT_DIR/$BINARY_NAME" "$INSTALL_DIR/" || {
+    # Copy the binary (with force to overwrite any existing file)
+    log "INFO" "Installing binary to $INSTALL_DIR (overwriting if exists)..."
+    cp -f "$OUTPUT_DIR/$BINARY_NAME" "$INSTALL_DIR/" || {
         log "ERROR" "Failed to copy binary to $INSTALL_DIR using sudo"
         exit 1
     }
-    log "INFO" "Binary copied to $INSTALL_DIR successfully"
+    log "INFO" "Binary installed to $INSTALL_DIR successfully"
 else
-    # Check if the binary already exists in the target location
-    if [ -f "$INSTALL_DIR/$BINARY_NAME" ]; then
-        log "WARN" "$BINARY_NAME already exists in $INSTALL_DIR. Creating backup..."
-        mv "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/${BINARY_NAME}.backup" || {
-            log "ERROR" "Failed to create backup of existing binary"
-            exit 1
-        }
-        log "INFO" "Backup created at $INSTALL_DIR/${BINARY_NAME}.backup"
-    fi
-    
-    # Copy the binary instead of moving to preserve the original
-    cp "$OUTPUT_DIR/$BINARY_NAME" "$INSTALL_DIR/" || {
+    # Copy the binary (with force to overwrite any existing file)
+    log "INFO" "Installing binary to $INSTALL_DIR (overwriting if exists)..."
+    cp -f "$OUTPUT_DIR/$BINARY_NAME" "$INSTALL_DIR/" || {
         log "ERROR" "Failed to copy binary to $INSTALL_DIR"
         exit 1
     }
-    log "INFO" "Binary copied to $INSTALL_DIR successfully"
+    log "INFO" "Binary installed to $INSTALL_DIR successfully"
 fi
 
 # Step 7: Confirm the binary is accessible
@@ -146,13 +128,6 @@ log "INFO" "Verifying installation..."
 if command -v "$BINARY_NAME" &>/dev/null; then
     log "INFO" "$BINARY_NAME is now available in PATH"
     
-    # Verify the binary actually works
-    log "INFO" "Testing binary functionality..."
-    if "$BINARY_NAME" --version &>/dev/null || "$BINARY_NAME" -v &>/dev/null; then
-        log "INFO" "Binary test successful"
-    else
-        log "WARN" "Binary exists but returned non-zero exit code during testing"
-    fi
 else
     log "ERROR" "$BINARY_NAME command not found after installation"
     log "WARN" "You may need to add $INSTALL_DIR to your PATH or restart your terminal"
