@@ -22,6 +22,25 @@ var (
 	openaiAPIKey  string
 )
 
+// Command history tracking (in-memory)
+type CommandHistory struct {
+	Entries  []HistoryEntry
+	MaxSize  int
+	MaxWords int
+}
+
+type HistoryEntry struct {
+	Command string
+	Output  string
+}
+
+// Create a global history tracker
+var history = CommandHistory{
+	Entries:  []HistoryEntry{},
+	MaxSize:  5,  // Store the last 5 commands
+	MaxWords: 100, // Limit to last 100 words per entry
+}
+
 // ANSI color codes
 const (
 	colorReset  = "\033[0m"
@@ -57,6 +76,45 @@ func initConfigFiles() error {
 	configFile = filepath.Join(configDir, "config.json")
 	
 	return nil
+}
+
+// Add command and its output to history
+func (h *CommandHistory) Add(command, output string) {
+	// Trim output to max words
+	words := strings.Fields(output)
+	if len(words) > h.MaxWords {
+		words = words[len(words)-h.MaxWords:]
+		output = strings.Join(words, " ")
+	}
+	
+	// Create new entry
+	entry := HistoryEntry{
+		Command: command,
+		Output:  output,
+	}
+	
+	// Add to history, keeping only the most recent MaxSize entries
+	h.Entries = append(h.Entries, entry)
+	if len(h.Entries) > h.MaxSize {
+		h.Entries = h.Entries[len(h.Entries)-h.MaxSize:]
+	}
+}
+
+// Get history context as formatted string for the prompt
+func (h *CommandHistory) GetContext() string {
+	if len(h.Entries) == 0 {
+		return ""
+	}
+	
+	var context strings.Builder
+	context.WriteString("\n\nRecent command history (for context):\n")
+	
+	for i, entry := range h.Entries {
+		context.WriteString(fmt.Sprintf("\nCOMMAND %d: %s\nOUTPUT %d: %s\n", 
+			i+1, entry.Command, i+1, entry.Output))
+	}
+	
+	return context.String()
 }
 
 // Save API key to a configuration file
@@ -102,6 +160,9 @@ func cleanupConfigFiles() error {
 
 // Get command suggestion from OpenAI API and return token usage
 func getCommandSuggestion(query string) (string, int, int, error) {
+	// Add command history context to the prompt
+	historyContext := history.GetContext()
+	
 	prompt := fmt.Sprintf(`
 Always adhere to these rules when suggesting the command:
 - The command must be a valid terminal command.
@@ -118,11 +179,15 @@ Format your response as follows:
 - Do not include any formattings.
 - Do not include 'dingus-aid' in the command.
 
+The command line history is as follows:
+
+<COMMAND_HISTORY> %s </COMMAND_HISTORY>
+
 The user query is as follows:
 
 <USER_QUESTION> %s </USER_QUESTION>
 
-Suggested command:`, query)
+Suggested command:`, historyContext, query)
 
 	reqBody := map[string]interface{}{
 		"model": "gpt-4o-mini",
@@ -300,10 +365,11 @@ func main() {
 	}
 	confirm = strings.TrimSpace(strings.ToLower(confirm))
 
+	var output string
 	switch confirm {
 	case "y":
 		// Run the suggested command
-		output, err := runCommand(suggestedCommand)
+		output, err = runCommand(suggestedCommand)
 		if err != nil {
 			fmt.Printf("Command returned error: %v\n", err)
 			fmt.Printf("Output:\n%s\n", output)
@@ -311,6 +377,9 @@ func main() {
 			// Output the result
 			fmt.Printf("\n%sCommand output:%s\n%s\n", colorBold, colorReset, output)
 		}
+		
+		// Add to command history
+		history.Add(suggestedCommand, output)
 		
 	case "c":
 		// copy to clipboard
