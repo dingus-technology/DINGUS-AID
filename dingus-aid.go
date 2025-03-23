@@ -37,8 +37,8 @@ type HistoryEntry struct {
 // Create a global history tracker
 var history = CommandHistory{
 	Entries:  []HistoryEntry{},
-	MaxSize:  5,  // Store the last 5 commands
-	MaxWords: 100, // Limit to last 100 words per entry
+	MaxSize:  8,  // Store the last 5 commands
+	MaxWords: 160, // Limit to last 100 words per entry
 }
 
 // ANSI color codes
@@ -169,6 +169,7 @@ Always adhere to these rules when suggesting the command:
 - It should be relevant to the user's query.
 - Continue the conversation by giving useful commands.
 - Consider the chat history and make the command more useful than before based on the user's follow up questions.
+- Use information from the chat history to help generate the command.
 - The command should not require user input.
 - It must not be destructive or modify the system in any harmful way.
 - The command should not require additional software, configuration, or access to external resources, the internet, or sensitive information.
