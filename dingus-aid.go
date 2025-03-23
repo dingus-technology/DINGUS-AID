@@ -19,7 +19,6 @@ import (
 var (
 	configDir     string
 	configFile    string
-	historyFile   string
 	openaiAPIKey  string
 )
 
@@ -29,14 +28,15 @@ const (
 	colorGreen  = "\033[32m"
 	colorYellow = "\033[33m"
 	colorCyan   = "\033[36m"
+	colorPurple = "\033[35m"
 	colorBold   = "\033[1m"
 )
 
-// Structure to hold a command entry
-type Entry struct {
-	Query    string `json:"query"`
-	Response string `json:"response"`
-}
+// API cost rates per million tokens
+const (
+	inputTokenCost  = 0.15  // $0.15 per million tokens
+	outputTokenCost = 0.60  // $0.60 per million tokens
+)
 
 // Initialize config directory and files
 func initConfigFiles() error {
@@ -55,7 +55,6 @@ func initConfigFiles() error {
 	
 	// Set global file paths
 	configFile = filepath.Join(configDir, "config.json")
-	historyFile = filepath.Join(configDir, "history.json")
 	
 	return nil
 }
@@ -91,46 +90,6 @@ func loadAPIKey() (string, error) {
 	return "", fmt.Errorf("API key not found")
 }
 
-// Load history from file
-func loadHistory() ([]Entry, error) {
-	history := []Entry{}
-	
-	// Check if history file exists
-	if _, err := os.Stat(historyFile); os.IsNotExist(err) {
-		// Return empty history if file doesn't exist
-		return history, nil
-	}
-	
-	// Read the history file
-	data, err := os.ReadFile(historyFile)
-	if err != nil {
-		return history, fmt.Errorf("failed to read history file: %v", err)
-	}
-	
-	// Unmarshal JSON into history slice
-	err = json.Unmarshal(data, &history)
-	if err != nil {
-		return history, fmt.Errorf("failed to parse history file: %v", err)
-	}
-	
-	return history, nil
-}
-
-// Save history to file
-func saveHistory(history []Entry) error {
-	historyJSON, err := json.MarshalIndent(history, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to encode history: %v", err)
-	}
-	
-	err = os.WriteFile(historyFile, historyJSON, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to write history file: %v", err)
-	}
-	
-	return nil
-}
-
 // Remove all configuration files
 func cleanupConfigFiles() error {
 	// Remove the entire config directory
@@ -141,48 +100,16 @@ func cleanupConfigFiles() error {
 	return nil
 }
 
-// Truncate history context to approximately the last 100 words
-func truncateHistoryContext(context string) string {
-	words := strings.Fields(context)
-	if len(words) <= 100 {
-		return context
-	}
-	
-	// Take only the last 100 words
-	truncatedWords := words[len(words)-100:]
-	return strings.Join(truncatedWords, " ")
-}
-
-// Get command suggestion from OpenAI API
-func getCommandSuggestion(query string, history []Entry) (string, error) {
-	// Build context from the last 5 entries in history (or fewer if not available)
-	context := ""
-	startIdx := 0
-	if len(history) > 5 {
-		startIdx = len(history) - 5
-	}
-	
-	for i := startIdx; i < len(history); i++ {
-		context += fmt.Sprintf("User: %s\nBot: %s\n", history[i].Query, history[i].Response)
-	}
-	
-	// Truncate context to approximately the last 100 words
-	context = truncateHistoryContext(context)
-
+// Get command suggestion from OpenAI API and return token usage
+func getCommandSuggestion(query string) (string, int, int, error) {
 	prompt := fmt.Sprintf(`
-Here is the history of the current CLI session:
-
-<HISTORY> %s </HISTORY>
-
 Always adhere to these rules when suggesting the command:
 - The command must be a valid terminal command.
-- It should be a continuation of the conversation.
 - It should be relevant to the user's query.
-- Consider the user's recent command history to provide context-aware suggestions.
 - The command should not require user input.
 - It must not be destructive or modify the system in any harmful way.
-- The command should not require additional software, configuration, or access to external resources, the internet, or sensitive information unless the history shows the user has been working with these.
-- The command should not reference user-specific files or data unless evident from their command history.
+- The command should not require additional software, configuration, or access to external resources, the internet, or sensitive information.
+- The command should not reference user-specific files or data.
 
 Format your response as follows:
 - Only respond with the suggested command.
@@ -195,24 +122,24 @@ The user query is as follows:
 
 <USER_QUESTION> %s </USER_QUESTION>
 
-Suggested command:`, context, query)
+Suggested command:`, query)
 
 	reqBody := map[string]interface{}{
 		"model": "gpt-4o-mini",
 		"messages": []interface{}{
-			map[string]interface{}{"role": "system", "content": "You are a helpful assistant designed to suggest valid, safe, and relevant terminal commands based on user input and session history."},
+			map[string]interface{}{"role": "system", "content": "You are a helpful assistant designed to suggest valid, safe, and relevant terminal commands based on user input."},
 			map[string]interface{}{"role": "user", "content": prompt},
 		},
 		"max_tokens": 100,
 	}
 	reqData, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", err
+		return "", 0, 0, err
 	}
 
 	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(reqData))
 	if err != nil {
-		return "", err
+		return "", 0, 0, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -221,32 +148,50 @@ Suggested command:`, context, query)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return "", 0, 0, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("error from OpenAI API: %s - %s", resp.Status, string(bodyBytes))
+		return "", 0, 0, fmt.Errorf("error from OpenAI API: %s - %s", resp.Status, string(bodyBytes))
 	}
 
 	var result map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
-		return "", err
+		return "", 0, 0, err
+	}
+
+	// Extract token usage
+	promptTokens, completionTokens := 0, 0
+	if usage, ok := result["usage"].(map[string]interface{}); ok {
+		if pt, ok := usage["prompt_tokens"].(float64); ok {
+			promptTokens = int(pt)
+		}
+		if ct, ok := usage["completion_tokens"].(float64); ok {
+			completionTokens = int(ct)
+		}
 	}
 
 	if choices, ok := result["choices"].([]interface{}); ok && len(choices) > 0 {
 		if choice, ok := choices[0].(map[string]interface{}); ok {
 			if message, ok := choice["message"].(map[string]interface{}); ok {
 				if text, ok := message["content"].(string); ok {
-					return strings.TrimSpace(text), nil
+					return strings.TrimSpace(text), promptTokens, completionTokens, nil
 				}
 			}
 		}
 	}
 
-	return "", fmt.Errorf("no valid response from OpenAI API")
+	return "", promptTokens, completionTokens, fmt.Errorf("no valid response from OpenAI API")
+}
+
+// Calculate API call cost
+func calculateCost(promptTokens, completionTokens int) float64 {
+	promptCost := float64(promptTokens) * inputTokenCost / 1_000_000
+	completionCost := float64(completionTokens) * outputTokenCost / 1_000_000
+	return promptCost + completionCost
 }
 
 // Run the suggested command
@@ -274,36 +219,6 @@ func copyToClipboard(text string) error {
 	
 	// For non-Windows platforms
 	cmd.Stdin = strings.NewReader(text)
-	return cmd.Run()
-}
-
-// Copy and paste to terminal (simulates keyboard input)
-func copyPasteToTerminal(text string) error {
-	// Copy to clipboard first
-	err := copyToClipboard(text)
-	if err != nil {
-		return err
-	}
-	
-	// Simulate paste operation based on OS
-	var cmd *exec.Cmd
-	
-	switch runtime.GOOS {
-	case "darwin": // macOS
-		cmd = exec.Command("osascript", "-e", 
-			`tell application "System Events" to keystroke "v" using command down`)
-	case "linux":
-		// Using xdotool to simulate Ctrl+Shift+V (paste in terminal)
-		cmd = exec.Command("xdotool", "key", "ctrl+shift+v")
-	case "windows":
-		// Windows terminal typically uses Ctrl+V
-		cmd = exec.Command("cmd", "/c", "echo Paste operation not fully supported on Windows")
-		fmt.Println("For Windows, please use Ctrl+V to paste manually.")
-		return nil
-	default:
-		return fmt.Errorf("unsupported platform")
-	}
-	
 	return cmd.Run()
 }
 
@@ -355,20 +270,15 @@ func main() {
 		}
 		fmt.Println("API key saved.")
 	}
-	
-	// Load command history from file
-	history, err := loadHistory()
-	if err != nil {
-		log.Printf("Warning: Could not load command history: %v", err)
-		// Continue with empty history if there's an error
-		history = []Entry{}
-	}
 
-	// Get the suggested command from OpenAI
-	suggestedCommand, err := getCommandSuggestion(query, history)
+	// Get the suggested command from OpenAI and token usage
+	suggestedCommand, promptTokens, completionTokens, err := getCommandSuggestion(query)
 	if err != nil {
 		log.Fatalf("Error getting command suggestion: %v", err)
 	}
+
+	// Calculate the cost
+	cost := calculateCost(promptTokens, completionTokens)
 
 	// Output the suggested command with decoration
 	fmt.Printf("\n%s%s%sSuggested command:%s %s%s%s%s%s\n\n", 
@@ -377,6 +287,9 @@ func main() {
 		colorCyan, colorBold, 
 		suggestedCommand,
 		colorReset, colorReset)
+		
+	// Output the token usage and cost in purple
+	fmt.Printf("%sQuery cost: $%.6f%s\n\n", colorPurple, cost, colorReset)
 
 	// Ask if the user wants to run the command
 	reader := bufio.NewReader(os.Stdin)
@@ -397,23 +310,6 @@ func main() {
 		} else {
 			// Output the result
 			fmt.Printf("\n%sCommand output:%s\n%s\n", colorBold, colorReset, output)
-		}
-
-		// Update history with new entry
-		history = append(history, Entry{
-			Query:    query,
-			Response: output,
-		})
-		
-		// If we have more than 5 entries, remove the oldest one(s)
-		for len(history) > 5 {
-			history = history[1:]
-		}
-		
-		// Save updated history to file
-		err = saveHistory(history)
-		if err != nil {
-			log.Printf("Warning: Could not save command history: %v", err)
 		}
 		
 	case "c":
