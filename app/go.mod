@@ -1,3 +1,3 @@
-module app/dingus-aid
+module app/dingus-copilot
 
 go 1.19
