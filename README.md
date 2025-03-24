@@ -1,7 +1,7 @@
 # Never forget those complicated CLI commands again - [**Dingus Copilot**](http://www.dingusai.dev) 🧙‍♂️
 
 <p align="center">
-   <img src="assets/dingus-copilot-example.png" width="60%">
+   <img src="assets/dingus-copilot-example.png" width="75%">
 </p>
 
 Welcome to **Dingus Aid**! 🛠️ This command-line tool is here to help you by suggesting and running the right commands for you—automatically! Whether you're a beginner or a seasoned pro, Dingus Aid uses the power of AI to figure out the next step based on your query.
