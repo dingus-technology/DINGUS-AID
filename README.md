@@ -1,4 +1,4 @@
-# [**Dingus**](http://www.dingusai.dev) CLI Tool - The Command-Suggestion Wizard 🧙‍♂️
+# Never forget those complicated CLI commands again - [**Dingus Copilot**](http://www.dingusai.dev) 🧙‍♂️
 
 <p align="center">
    <img src="assets/dingus-copilot-example.png" width="60%">
