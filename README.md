@@ -107,7 +107,7 @@ Want to make Dingus Aid even smarter? 🧠 Feel free to fork this repo and creat
 - Ingest the command line history into the prompt.
 - Include extra context for the CLI, such as the current directory and its contents.
 - Upgrade gracefulness of `dingus-copilot-installer.sh`.
-- Output cli stdout in real timie not once commands have all finshed running.
+- Output cli stdout in real time not once commands have all finshed running.
 
 ---
 
